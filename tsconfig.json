@@ -1,5 +1,6 @@
 {
   "compilerOptions": {
+    "paths": {"async-storage-sync": ["../sync-queue/src"]},
     "target": "ES2020",
     "module": "ESNext",
     "moduleResolution": "Bundler",

@@ -1,7 +1,7 @@
 {
-  "name": "sync-queue",
+  "name": "async-storage-sync",
   "version": "1.0.0",
-  "description": "Offline-first sync queue for React Native",
+  "description": "Offline-first data layer for React Native with local-first storage and automatic sync",
   "main": "dist/index.js",
   "module": "dist/index.mjs",
   "types": "dist/index.d.ts",
@@ -13,12 +13,14 @@
     "react-native",
     "offline",
     "sync",
+    "asyncstorage",
     "queue",
-    "retry"
+    "offline-first"
   ],
   "license": "MIT",
   "peerDependencies": {
-    "react": ">=18.0.0",
+    "@react-native-async-storage/async-storage": ">=1.0.0",
+    "@react-native-community/netinfo": "^12.0.1",
     "react-native": ">=0.70.0"
   },
   "devDependencies": {
