@@ -1,6 +1,6 @@
 # async-storage-sync
 
-**Offline-first data layer for React Native** — Save locally, sync when connected.
+**Offline-first data layer for React Native** — save locally, sync to your server when connected.
 
 ## Install
 
@@ -8,139 +8,13 @@
 npm install async-storage-sync @react-native-async-storage/async-storage @react-native-community/netinfo
 ```
 
-`@react-native-async-storage/async-storage` and `@react-native-community/netinfo` are required peer dependencies used by this package.
+## Quick Start
 
-## 30-Second Start
-
-Initialize once in your app (no separate files required):
+**1. Initialize once in `App.tsx`:**
 
 ```ts
-// App.tsx
-import React, { useEffect } from 'react';
 import { initSyncQueue } from 'async-storage-sync';
 
-export default function App() {
-  useEffect(() => {
-    void initSyncQueue({
-      driver: 'asyncstorage',
-      serverUrl: 'https://api.example.com',
-      credentials: { apiKey: 'YOUR_API_KEY' },
-      endpoint: '/submit',
-      autoSync: false,
-    });
-  }, []);
-
-  return <YourApp />;
-}
-```
-
-Now use it anywhere in your app:
-
-```ts
-import { getSyncQueue } from 'async-storage-sync';
-
-const store = getSyncQueue();
-
-// Save record (saved locally immediately)
-await store.save('forms', { 
-  formId: '123', 
-  name: 'John', 
-  timestamp: new Date().toISOString() 
-});
-
-// Sync and get summary result
-const result = await store.flushWithResult();
-console.log(`Synced: ${result.synced}, Failed: ${result.failed}, Remaining: ${result.remainingPending}`);
-
-// List pending records
-const pending = await store.getAll('forms');
-console.log(`${pending.length} forms waiting to sync`);
-```
-
-## Sync Behavior (Auto vs Manual)
-
-- `autoSync: true` (default): when the app starts, the package checks connectivity and attempts sync if online.
-- `autoSync: true` also listens for reconnect events and retries pending items automatically.
-- `autoSyncCollections` (optional): when set, auto-sync on reconnect targets only those collections.
-- `autoSync: false`: no automatic syncing; call sync methods manually when you choose.
-- Manual methods:
-  - `store.flushWithResult()` → sync all pending and return summary counts
-  - `store.syncWithResult(collection)` → sync one collection and return summary counts
-  - `store.syncManyWithResult(collections)` → sync only selected collections and return merged summary counts
-  - `store.syncById(collection, id)` → sync one record
-- Sync destination is controlled by your config: `serverUrl + endpoint`.
-
-## API Reference
-
-### Setup
-
-| Function | Purpose |
-|--------|---------|
-| `initSyncQueue(config)` | Initialize singleton once at app startup (safe to call repeatedly) |
-| `getSyncQueue()` | Get initialized singleton instance |
-| `setStorageDriver(storage)` | Inject storage client explicitly (useful for symlink/local package setups) |
-
-### Store Methods (`const store = getSyncQueue()`)
-
-| Method | Purpose |
-|--------|---------|
-| `store.save(collection, data, options?)` | Save one record locally and enqueue for sync |
-| `store.getAll(collection)` | Get all records from one collection |
-| `store.getById(collection, id)` | Get one record by internal `_id` |
-| `store.deleteById(collection, id)` | Delete one record by internal `_id` |
-| `store.deleteCollection(collection)` | Delete all records in one collection |
-| `store.flushWithResult()` | Sync all pending and return detailed summary (`attempted`, `synced`, `failed`, `retried`, `remainingPending`, `items`) |
-| `store.syncWithResult(collection)` | Sync collection and return detailed summary (same format as `flushWithResult()`) |
-| `store.syncManyWithResult(collections)` | Sync selected collections and return one merged summary (same format as `flushWithResult()`) |
-| `store.syncById(collection, id)` | Sync one specific record by internal `_id` |
-| `store.requeueFailed()` | Move `failed` records back to pending queue for retry |
-| `store.onSynced(callback)` | Event callback for successful sync of each item |
-| `store.onAuthError(callback)` | Event callback when sync returns `401` or `403` |
-| `store.onStorageFull(callback)` | Event callback when local storage is full on save |
-| `store.getQueue()` | Inspect in-memory queue items (debug/metrics) |
-| `store.destroy()` | Stop engine, clear queue/storage, and reset singleton |
-
-## Quick Examples
-
-**Auto-sync when internet reconnects:**
-```ts
-import NetInfo from '@react-native-community/netinfo';
-import { getSyncQueue } from 'async-storage-sync';
-
-NetInfo.addEventListener(state => {
-  if (state.isConnected) {
-    void getSyncQueue().flushWithResult();
-  }
-});
-```
-
-**Handle authentication errors:**
-```ts
-const store = getSyncQueue();
-
-store.onAuthError((statusCode, item) => {
-  if (statusCode === 401 || statusCode === 403) {
-    console.log('Session expired, re-login needed');
-  }
-});
-```
-
-**Transform data before sending to server:**
-```ts
-initSyncQueue({
-  driver: 'asyncstorage',
-  serverUrl: 'https://api.example.com',
-  credentials: { apiKey: 'KEY' },
-  endpoint: '/submit',
-  payloadTransformer: (record) => {
-    const { _id, _ts, _synced, _retries, ...payload } = record;
-    return payload;
-  },
-});
-```
-
-**Use custom auth headers/keys:**
-```ts
 initSyncQueue({
   driver: 'asyncstorage',
   serverUrl: 'https://api.example.com',
@@ -149,72 +23,175 @@ initSyncQueue({
     'x-api-key': 'my-custom-key',
   },
   endpoint: '/submit',
+  autoSync: true,
 });
 ```
 
-**Handle duplicates:**
-```ts
-// Keep all (default)
-await store.save('logs', { event: 'tap' });
+**2. Save data anywhere in your app:**
 
-// Replace existing type
-await store.save('profile', { userId: 1, name: 'Bob' }, {
-  type: 'currentUser',
-  duplicateStrategy: 'overwrite',
-});
-```
-
-**Logout cleanup:**
 ```ts
+import { getSyncQueue } from 'async-storage-sync';
+
 const store = getSyncQueue();
-await store.deleteCollection('submissions');
+
+await store.save('submissions', {
+  formId: '123',
+  name: 'John',
+  timestamp: new Date().toISOString(),
+});
 ```
+
+**3. Sync and check the result:**
+
+```ts
+const result = await store.flushWithResult('submissions');
+console.log(`Synced: ${result.synced}, Failed: ${result.failed}, Remaining: ${result.remainingPending}`);
+```
+
+---
 
 ## Configuration
 
 ```ts
 initSyncQueue({
-  driver: 'asyncstorage',           // (required) only driver type
-  serverUrl: string,                // (required) API base URL
-  credentials: Record<string, string>, // (required) merged into request headers
-  endpoint?: '/submit',             // route to POST data
-  autoSync?: false,                 // auto-sync on reconnect
-  autoSyncCollections?: ['invoices', 'payments'], // optional: only these collections auto-sync on reconnect
-  onSyncSuccess?: 'keep',           // after sync: keep|delete|ttl
-  ttl?: 7 * 24 * 60 * 60 * 1000,   // if ttl mode, keep duration
-  duplicateStrategy?: 'append',     // append or overwrite
-  payloadTransformer?: (r) => r,    // optional: shape before send
+  // required
+  driver: 'asyncstorage',
+  serverUrl: 'https://api.example.com',
+  credentials: {
+    Authorization: 'Token abc123', // sent as-is in request headers
+    'x-api-key': 'my-custom-key',  // any key/value pair works
+  },
+  endpoint: '/submit',
+
+  // optional
+  autoSync: true,                              // auto-flush on app open + reconnect (default: true)
+  autoSyncCollections: ['submissions'],        // limit auto-sync to these collections; empty = all
+  onSyncSuccess: 'delete',                     // what to do after a successful sync: 'keep' | 'delete' | 'ttl'
+  ttl: 7 * 24 * 60 * 60 * 1000,              // used only when onSyncSuccess is 'ttl'
+  duplicateStrategy: 'append',                 // 'append' (default) | 'overwrite'
+  payloadTransformer: (record) => {            // strip internal fields before sending to server
+    const { _id, _ts, _synced, _retries, ...payload } = record;
+    return payload;
+  },
 });
 ```
 
-Notes:
-- `credentials.apiKey` remains supported and is sent as `Authorization: Bearer <apiKey>` if no `Authorization` header is provided.
-- Any other key/value pairs in `credentials` are sent as-is in request headers.
+> `credentials` values are merged directly into request headers. Any key/value pair is supported.
+
+---
+
+## API
+
+### Setup
+
+```ts
+initSyncQueue(config)   // call once at app startup — safe to call again, won't re-init
+getSyncQueue()          // get the instance anywhere in your app
+```
+
+### Write
+
+```ts
+store.save(collection, data, options?)  // save locally and enqueue for sync
+```
+
+`options` (all optional, override global config for this call only):
+
+| Option | Values | Description |
+|--------|--------|-------------|
+| `type` | `string` | Labels the record — used by `overwrite` strategy to find and replace |
+| `onSyncSuccess` | `'keep'` \| `'delete'` \| `'ttl'` | What happens to the local copy after sync |
+| `duplicateStrategy` | `'append'` \| `'overwrite'` | Whether to add a new record or replace an existing one of the same `type` |
+
+### Read
+
+```ts
+store.getAll(collection)        // all records in a collection
+store.getById(collection, id)   // one record by its _id
+```
+
+### Delete
+
+```ts
+store.deleteById(collection, id)    // remove one record
+store.deleteCollection(collection)  // wipe entire collection — call on logout
+```
+
+### Sync
+
+```ts
+store.flushWithResult(collection)           // sync one collection, get a result summary
+store.syncManyWithResult(collections[])     // sync multiple collections, merged result summary
+store.syncById(collection, id)              // sync one specific record
+store.requeueFailed()                       // move 'failed' records back to pending for retry
+```
+
+**Result summary shape:**
+
+```ts
+{
+  attempted, synced, failed, retried,
+  deferred, networkErrors, remainingPending,
+  skippedAlreadyFlushing, items
+}
+```
+
+### Events
+
+```ts
+store.onSynced(callback)       // fires after each record syncs successfully
+store.onAuthError(callback)    // fires on 401/403 — use to trigger re-login
+store.onStorageFull(callback)  // fires when device storage is full
+```
+
+### Debug
+
+```ts
+store.getQueue()  // inspect the in-memory queue
+store.destroy()   // stop engine, clear everything, reset singleton
+```
+
+---
 
 ## How It Works
 
-1. **Save** — Records written to AsyncStorage immediately
-2. **Queue** — Each save queued for syncing
-3. **Sync** — `flushWithResult()` POSTs all pending to your server and returns summary output
-4. **Status** — Records marked synced, then kept or deleted
-5. **Retry** — Failed syncs retry automatically (max 5x)
-6. **Persist** — Everything survives app restart
+1. `save()` writes the record to AsyncStorage immediately — no network needed.
+2. The record is added to a queue with `_synced: 'pending'`.
+3. On `flushWithResult()` (or automatically on reconnect if `autoSync: true`), queued records are POSTed to your server.
+4. On `200 OK` — the record is marked synced, then kept/deleted based on `onSyncSuccess`.
+5. On `5xx` — retried up to 5 times with exponential backoff.
+6. On `4xx` — marked `failed`, never retried. Fires `onAuthError` on 401/403.
+7. Everything persists across app restarts — the queue survives crashes.
 
-## Storage
+---
 
-- `asyncstorage::<collectionName>` — Your records + metadata (`_id`, `_ts`, `_synced`, `_retries`)
-- `asyncstorage::__queue__` — Sync queue
+## Stored Record Shape
+
+Every saved record gets these fields added automatically:
+
+```ts
+{
+  _id:      string   // uuid v4
+  _ts:      number   // Date.now() at save time
+  _synced:  'pending' | 'synced' | 'failed'
+  _type:    string   // from save() options.type, or ''
+  _retries: number   // sync attempt count
+
+  ...yourData        // everything you passed to save()
+}
+```
+
+---
 
 ## Limits
 
-✅ Works: 100s-1000s of records, multiple collections, TypeScript support, app crashes  
-❌ Limits: Max 5 retries, not a full database, config locks after init
+- Max 5 sync retries per record
+- Not a full database — designed for queuing records, not complex queries
+- Config is locked after `initSyncQueue()` is called
 
 ## Production Checklist
 
-- [ ] Use `payloadTransformer` to remove `_` fields before server
-- [ ] Handle `onAuthError` for 401/403
-- [ ] Set `autoSync: false` if you control sync timing
-- [ ] Test with `NetInfo` reconnect listener
-- [ ] Call `deleteCollection()` on logout
-- [ ] Monitor queue with `getQueue()` for ops metrics
+- [ ] Use `payloadTransformer` to strip `_` fields before they reach your server
+- [ ] Handle `onAuthError` to catch expired tokens
+- [ ] Call `deleteCollection()` on logout to clear user data
+- [ ] Set `autoSyncCollections` to limit which collections sync automatically
