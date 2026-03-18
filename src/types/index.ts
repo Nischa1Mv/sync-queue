@@ -7,9 +7,7 @@ export type DuplicateStrategy = 'append' | 'overwrite';
 export interface InitConfig {
   driver: DriverName;
   serverUrl: string;
-  credentials: {
-    apiKey: string;
-  };
+  credentials: Record<string, string>;
   /**
    * Optional transform applied to the stored record before it is sent to the server.
    * Use this to strip internal meta fields, rename keys, or reshape the payload

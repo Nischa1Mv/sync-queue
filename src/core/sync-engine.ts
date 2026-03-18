@@ -14,6 +14,18 @@ declare const require: (id: string) => any;
 const DEBOUNCE_MS = 500;
 const BACKOFF_BASE_MS = 1000;
 
+function buildAuthHeaders(credentials: Record<string, string>): Record<string, string> {
+  const headers: Record<string, string> = { ...credentials };
+  const apiKey = headers.apiKey;
+
+  if (apiKey && !headers.Authorization && !headers.authorization) {
+    headers.Authorization = `Bearer ${apiKey}`;
+  }
+
+  delete headers.apiKey;
+  return headers;
+}
+
 export class SyncEngine {
   private isFlushing = false;
   private unsubscribeNetInfo?: () => void;
@@ -147,7 +159,7 @@ export class SyncEngine {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${this.config.credentials.apiKey}`,
+          ...buildAuthHeaders(this.config.credentials),
         },
         body: JSON.stringify(body),
       });

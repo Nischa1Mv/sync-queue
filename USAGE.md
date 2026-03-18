@@ -31,6 +31,19 @@ export async function initOfflineStore() {
 }
 ```
 
+`credentials` are merged into request headers. You can either keep legacy `apiKey` or provide custom headers:
+
+```ts
+await AsyncStorageSync.init({
+  driver: 'asyncstorage',
+  serverUrl: 'https://api.example.com',
+  credentials: {
+    Authorization: 'Token abc123',
+    'x-api-key': 'custom-key',
+  },
+});
+```
+
 Example usage in app entry:
 
 ```ts

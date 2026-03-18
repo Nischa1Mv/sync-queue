@@ -135,6 +135,19 @@ initSyncQueue({
 });
 ```
 
+**Use custom auth headers/keys:**
+```ts
+initSyncQueue({
+  driver: 'asyncstorage',
+  serverUrl: 'https://api.example.com',
+  credentials: {
+    Authorization: 'Token abc123',
+    'x-api-key': 'my-custom-key',
+  },
+  endpoint: '/submit',
+});
+```
+
 **Handle duplicates:**
 ```ts
 // Keep all (default)
@@ -159,7 +172,7 @@ await store.deleteCollection('submissions');
 initSyncQueue({
   driver: 'asyncstorage',           // (required) only driver type
   serverUrl: string,                // (required) API base URL
-  credentials: { apiKey: string },  // (required) auth
+  credentials: Record<string, string>, // (required) merged into request headers
   endpoint?: '/submit',             // route to POST data
   autoSync?: false,                 // auto-sync on reconnect
   onSyncSuccess?: 'keep',           // after sync: keep|delete|ttl
@@ -168,6 +181,10 @@ initSyncQueue({
   payloadTransformer?: (r) => r,    // optional: shape before send
 });
 ```
+
+Notes:
+- `credentials.apiKey` remains supported and is sent as `Authorization: Bearer <apiKey>` if no `Authorization` header is provided.
+- Any other key/value pairs in `credentials` are sent as-is in request headers.
 
 ## How It Works
 

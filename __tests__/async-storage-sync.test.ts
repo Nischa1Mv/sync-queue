@@ -180,7 +180,7 @@ describe('AsyncStorageSync', () => {
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
     const body = JSON.parse(String(fetchMock.mock.calls[0][1]?.body));
-    expect(body.operations[0].id).toBe(second._id);
+    expect(body._id).toBe(second._id);
 
     const firstAfter = await store.getById<{ amount: number }>('invoices', first._id);
     const secondAfter = await store.getById<{ amount: number }>('invoices', second._id);
@@ -209,12 +209,59 @@ describe('AsyncStorageSync', () => {
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
     const body = JSON.parse(String(fetchMock.mock.calls[0][1]?.body));
-    expect(body.operations[0].key).toBe('invoices');
-    expect(body.operations[0].id).toBe(invoice._id);
+    expect(body._id).toBe(invoice._id);
+    expect(body.amount).toBe(100);
 
     const invoiceAfter = await store.getById<{ amount: number }>('invoices', invoice._id);
     const receiptAfter = await store.getById<{ amount: number }>('receipts', receipt._id);
     expect(invoiceAfter?._synced).toBe('synced');
     expect(receiptAfter?._synced).toBe('pending');
+  });
+
+  it('maps apiKey credential to Authorization header for backward compatibility', async () => {
+    const fetchMock = vi.fn(async () => ({
+      ok: true,
+      status: 200,
+    }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const store = await AsyncStorageSync.init({
+      driver: 'asyncstorage',
+      serverUrl: 'https://api.example.com',
+      credentials: { apiKey: 'legacy-key' },
+      onSyncSuccess: 'keep',
+    });
+
+    await store.save('invoices', { amount: 9 });
+    await store.flush();
+
+    const headers = fetchMock.mock.calls[0][1]?.headers as Record<string, string>;
+    expect(headers.Authorization).toBe('Bearer legacy-key');
+    expect(headers.apiKey).toBeUndefined();
+  });
+
+  it('sends custom credential key-value pairs as request headers', async () => {
+    const fetchMock = vi.fn(async () => ({
+      ok: true,
+      status: 200,
+    }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const store = await AsyncStorageSync.init({
+      driver: 'asyncstorage',
+      serverUrl: 'https://api.example.com',
+      credentials: {
+        'x-api-key': 'custom-key',
+        Authorization: 'Token abc123',
+      },
+      onSyncSuccess: 'keep',
+    });
+
+    await store.save('invoices', { amount: 12 });
+    await store.flush();
+
+    const headers = fetchMock.mock.calls[0][1]?.headers as Record<string, string>;
+    expect(headers['x-api-key']).toBe('custom-key');
+    expect(headers.Authorization).toBe('Token abc123');
   });
 });
