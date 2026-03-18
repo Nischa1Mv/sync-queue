@@ -6,6 +6,7 @@ import type {
   SaveOptions,
   StoredRecord,
   QueueItem,
+  FlushResult,
   SyncedCallback,
   AuthErrorCallback,
   StorageFullCallback,
@@ -201,8 +202,8 @@ export class AsyncStorageSync {
     await this.engine.flushRecord(id);
   }
 
-  async flush(): Promise<void> {
-    await this.engine.flush();
+  async flushWithResult(): Promise<FlushResult> {
+    return this.engine.flushWithResult();
   }
 
   /**

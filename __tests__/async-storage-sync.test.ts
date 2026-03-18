@@ -81,7 +81,7 @@ describe('AsyncStorageSync', () => {
     expect(all[0].amount).toBe(20);
   });
 
-  it('flush marks queue item synced when server returns 200', async () => {
+  it('flushWithResult marks queue item synced when server returns 200', async () => {
     vi.stubGlobal(
       'fetch',
       vi.fn(async () => ({
@@ -98,13 +98,56 @@ describe('AsyncStorageSync', () => {
     });
 
     const record = await store.save('invoices', { amount: 11 });
-    await store.flush();
+    await store.flushWithResult();
 
     const refreshed = await store.getById<{ amount: number }>('invoices', record._id);
     expect(refreshed?._synced).toBe('synced');
     expect(store.getQueue()[0]?.synced).toBe(true);
 
     vi.unstubAllGlobals();
+  });
+
+  it('flushWithResult returns sync summary counts', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+      })
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 401,
+      })
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 500,
+      });
+
+    vi.stubGlobal('fetch', fetchMock);
+
+    const store = await AsyncStorageSync.init({
+      driver: 'asyncstorage',
+      serverUrl: 'https://api.example.com',
+      credentials: { apiKey: 'k' },
+      onSyncSuccess: 'keep',
+    });
+
+    await store.save('invoices', { amount: 11 });
+    await store.save('invoices', { amount: 22 });
+    await store.save('invoices', { amount: 33 });
+
+    const result = await store.flushWithResult();
+
+    expect(result.skippedAlreadyFlushing).toBe(false);
+    expect(result.attempted).toBe(3);
+    expect(result.synced).toBe(1);
+    expect(result.failed).toBe(1);
+    expect(result.retried).toBe(1);
+    expect(result.networkErrors).toBe(0);
+    expect(result.deferred).toBe(0);
+    expect(result.remainingPending).toBe(1);
+    expect(result.items).toHaveLength(3);
+    expect(result.items.map((item) => item.status).sort()).toEqual(['failed', 'retried', 'synced']);
   });
 
   it('removes record after successful sync when onSyncSuccess is delete', async () => {
@@ -124,7 +167,7 @@ describe('AsyncStorageSync', () => {
     });
 
     const record = await store.save('invoices', { amount: 50 });
-    await store.flush();
+    await store.flushWithResult();
 
     const deleted = await store.getById<{ amount: number }>('invoices', record._id);
     expect(deleted).toBeNull();
@@ -150,7 +193,7 @@ describe('AsyncStorageSync', () => {
     store.onAuthError(onAuthError);
 
     const record = await store.save('invoices', { amount: 70 });
-    await store.flush();
+    await store.flushWithResult();
 
     const failed = await store.getById<{ amount: number }>('invoices', record._id);
     expect(onAuthError).toHaveBeenCalledTimes(1);
@@ -233,7 +276,7 @@ describe('AsyncStorageSync', () => {
     });
 
     await store.save('invoices', { amount: 9 });
-    await store.flush();
+    await store.flushWithResult();
 
     const headers = fetchMock.mock.calls[0][1]?.headers as Record<string, string>;
     expect(headers.Authorization).toBe('Bearer legacy-key');
@@ -258,7 +301,7 @@ describe('AsyncStorageSync', () => {
     });
 
     await store.save('invoices', { amount: 12 });
-    await store.flush();
+    await store.flushWithResult();
 
     const headers = fetchMock.mock.calls[0][1]?.headers as Record<string, string>;
     expect(headers['x-api-key']).toBe('custom-key');

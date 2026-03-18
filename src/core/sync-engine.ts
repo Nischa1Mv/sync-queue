@@ -7,6 +7,8 @@ import type {
   SyncedCallback,
   AuthErrorCallback,
   OnSyncSuccess,
+  FlushItemResult,
+  FlushResult,
 } from '../types';
 
 declare const require: (id: string) => any;
@@ -99,27 +101,66 @@ export class SyncEngine {
       clearTimeout(this.debounceTimer);
     }
     this.debounceTimer = setTimeout(() => {
-      void this.flush();
+      void this.flushWithResult();
     }, DEBOUNCE_MS);
   }
 
-  async flush(): Promise<void> {
+  async flushWithResult(): Promise<FlushResult> {
     if (this.isFlushing) {
       console.log('[SyncEngine] flush() skipped — already flushing');
-      return;
+      return {
+        attempted: 0,
+        synced: 0,
+        failed: 0,
+        retried: 0,
+        deferred: 0,
+        networkErrors: 0,
+        remainingPending: this.queue.getPending().length,
+        skippedAlreadyFlushing: true,
+        items: [],
+      };
     }
     this.isFlushing = true;
+
+    const result: FlushResult = {
+      attempted: 0,
+      synced: 0,
+      failed: 0,
+      retried: 0,
+      deferred: 0,
+      networkErrors: 0,
+      remainingPending: 0,
+      skippedAlreadyFlushing: false,
+      items: [],
+    };
 
     try {
       const pending = this.queue.getPending();
       console.log('[SyncEngine] flush() — pending items:', pending.length);
       if (pending.length === 0) {
         console.log('[SyncEngine] Nothing to sync.');
-        return;
+        result.remainingPending = 0;
+        return result;
       }
       for (const item of pending) {
-        await this.syncItem(item);
+        result.attempted += 1;
+        const itemResult = await this.syncItem(item);
+        result.items.push(itemResult);
+        if (itemResult.status === 'synced') {
+          result.synced += 1;
+        } else if (itemResult.status === 'failed') {
+          result.failed += 1;
+        } else if (itemResult.status === 'retried') {
+          result.retried += 1;
+        } else if (itemResult.status === 'deferred-backoff') {
+          result.deferred += 1;
+        } else if (itemResult.status === 'network-error') {
+          result.networkErrors += 1;
+        }
       }
+
+      result.remainingPending = this.queue.getPending().length;
+      return result;
     } finally {
       this.isFlushing = false;
     }
@@ -139,13 +180,18 @@ export class SyncEngine {
     }
   }
 
-  private async syncItem(item: QueueItem): Promise<void> {
+  private async syncItem(item: QueueItem): Promise<FlushItemResult> {
     if (item.retries > 0) {
       const backoffMs = Math.pow(2, item.retries) * BACKOFF_BASE_MS;
       const elapsed = Date.now() - item.ts;
       if (elapsed < backoffMs) {
         console.log(`[SyncEngine] syncItem backoff — retries: ${item.retries}, wait: ${backoffMs - elapsed}ms remaining`);
-        return;
+        return {
+          itemId: item.id,
+          collection: item.key,
+          recordId: item.recordId,
+          status: 'deferred-backoff',
+        };
       }
     }
 
@@ -167,13 +213,48 @@ export class SyncEngine {
       console.log(`[SyncEngine] Response: ${response.status} ${response.statusText}`);
       if (response.ok) {
         await this.handleSuccess(item);
+        return {
+          itemId: item.id,
+          collection: item.key,
+          recordId: item.recordId,
+          status: 'synced',
+          httpStatus: response.status,
+        };
       } else if (response.status >= 400 && response.status < 500) {
         await this.handleClientError(item, response.status);
+        return {
+          itemId: item.id,
+          collection: item.key,
+          recordId: item.recordId,
+          status: 'failed',
+          httpStatus: response.status,
+        };
       } else if (response.status >= 500) {
         await this.handleServerError(item);
+        return {
+          itemId: item.id,
+          collection: item.key,
+          recordId: item.recordId,
+          status: 'retried',
+          httpStatus: response.status,
+        };
       }
+
+      return {
+        itemId: item.id,
+        collection: item.key,
+        recordId: item.recordId,
+        status: 'failed',
+        httpStatus: response.status,
+      };
     } catch (e) {
       console.warn('[SyncEngine] 🔌 Network error (offline?) — will retry on next flush:', e);
+      return {
+        itemId: item.id,
+        collection: item.key,
+        recordId: item.recordId,
+        status: 'network-error',
+      };
     }
   }
 

@@ -51,6 +51,33 @@ export interface SaveOptions {
   duplicateStrategy?: DuplicateStrategy;
 }
 
+export type FlushItemStatus =
+  | 'synced'
+  | 'failed'
+  | 'retried'
+  | 'deferred-backoff'
+  | 'network-error';
+
+export interface FlushItemResult {
+  itemId: string;
+  collection: string;
+  recordId: string;
+  status: FlushItemStatus;
+  httpStatus?: number;
+}
+
+export interface FlushResult {
+  attempted: number;
+  synced: number;
+  failed: number;
+  retried: number;
+  deferred: number;
+  networkErrors: number;
+  remainingPending: number;
+  skippedAlreadyFlushing: boolean;
+  items: FlushItemResult[];
+}
+
 export type SyncedCallback = (item: QueueItem) => void;
 export type AuthErrorCallback = (statusCode: number, item: QueueItem) => void;
 export type StorageFullCallback = () => void;

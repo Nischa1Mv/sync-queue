@@ -48,8 +48,9 @@ await store.save('forms', {
   timestamp: new Date().toISOString() 
 });
 
-// Sync all pending records to server
-await store.flush();
+// Sync and get summary result
+const result = await store.flushWithResult();
+console.log(`Synced: ${result.synced}, Failed: ${result.failed}, Remaining: ${result.remainingPending}`);
 
 // List pending records
 const pending = await store.getAll('forms');
@@ -62,7 +63,7 @@ console.log(`${pending.length} forms waiting to sync`);
 - `autoSync: true` also listens for reconnect events and retries pending items automatically.
 - `autoSync: false`: no automatic syncing; call sync methods manually when you choose.
 - Manual methods:
-  - `store.flush()` → sync all pending items
+  - `store.flushWithResult()` → sync all pending and return summary counts
   - `store.sync(collection)` → sync one collection
   - `store.syncById(collection, id)` → sync one record
 - Sync destination is controlled by your config: `serverUrl + endpoint`.
@@ -86,7 +87,7 @@ console.log(`${pending.length} forms waiting to sync`);
 | `store.getById(collection, id)` | Get one record by internal `_id` |
 | `store.deleteById(collection, id)` | Delete one record by internal `_id` |
 | `store.deleteCollection(collection)` | Delete all records in one collection |
-| `store.flush()` | Sync all pending queue items |
+| `store.flushWithResult()` | Sync all pending and return detailed summary (`attempted`, `synced`, `failed`, `retried`, `remainingPending`, `items`) |
 | `store.sync(collection)` | Sync pending items for one collection only |
 | `store.syncById(collection, id)` | Sync one specific record by internal `_id` |
 | `store.requeueFailed()` | Move `failed` records back to pending queue for retry |
@@ -105,7 +106,7 @@ import { getSyncQueue } from 'async-storage-sync';
 
 NetInfo.addEventListener(state => {
   if (state.isConnected) {
-    void getSyncQueue().flush();
+    void getSyncQueue().flushWithResult();
   }
 });
 ```
@@ -190,7 +191,7 @@ Notes:
 
 1. **Save** — Records written to AsyncStorage immediately
 2. **Queue** — Each save queued for syncing
-3. **Sync** — `flush()` POSTs all pending to your server
+3. **Sync** — `flushWithResult()` POSTs all pending to your server and returns summary output
 4. **Status** — Records marked synced, then kept or deleted
 5. **Retry** — Failed syncs retry automatically (max 5x)
 6. **Persist** — Everything survives app restart

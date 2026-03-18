@@ -106,8 +106,9 @@ await store.deleteCollection('old-invoices');
 ## 6) Sync APIs
 
 ```ts
-// Sync everything pending across all collections
-await store.flush();
+// Sync everything and get summary output
+const result = await store.flushWithResult();
+console.log(result);
 
 // Sync only one collection
 await store.sync('invoices');
@@ -144,7 +145,7 @@ console.log('Pending queue:', queue);
 
 - Initialize in app bootstrap.
 - Use collection names by feature (`invoices`, `receipts`, `orders`).
-- Use `flush()` for manual “Sync now” buttons.
+- Use `flushWithResult()` for manual “Sync now” buttons when you need user-facing success/failure counts.
 - Handle `onAuthError` globally for `401/403` recovery.
 - Prefer `append` unless you explicitly want single-record-per-type behavior.
 
