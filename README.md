@@ -8,6 +8,8 @@
 npm install async-storage-sync @react-native-async-storage/async-storage @react-native-community/netinfo
 ```
 
+`@react-native-async-storage/async-storage` and `@react-native-community/netinfo` are required peer dependencies used by this package.
+
 ## 30-Second Start
 
 Initialize once in your app (no separate files required):
@@ -54,23 +56,45 @@ const pending = await store.getAll('forms');
 console.log(`${pending.length} forms waiting to sync`);
 ```
 
-## Core Methods
+## Sync Behavior (Auto vs Manual)
+
+- `autoSync: true` (default): when the app starts, the package checks connectivity and attempts sync if online.
+- `autoSync: true` also listens for reconnect events and retries pending items automatically.
+- `autoSync: false`: no automatic syncing; call sync methods manually when you choose.
+- Manual methods:
+  - `store.flush()` → sync all pending items
+  - `store.sync(collection)` → sync one collection
+  - `store.syncById(collection, id)` → sync one record
+- Sync destination is controlled by your config: `serverUrl + endpoint`.
+
+## API Reference
+
+### Setup
+
+| Function | Purpose |
+|--------|---------|
+| `initSyncQueue(config)` | Initialize singleton once at app startup (safe to call repeatedly) |
+| `getSyncQueue()` | Get initialized singleton instance |
+| `setStorageDriver(storage)` | Inject storage client explicitly (useful for symlink/local package setups) |
+
+### Store Methods (`const store = getSyncQueue()`)
 
 | Method | Purpose |
 |--------|---------|
-| `initSyncQueue(config)` | Initialize once at app startup |
-| `getSyncQueue()` | Get the instance anywhere |
-| `store.save(collection, data)` | Save a record locally |
-| `store.getAll(collection)` | Get all records in collection |
-| `store.getById(collection, id)` | Get one record by ID |
-| `store.deleteById(collection, id)` | Delete one record |
-| `store.deleteCollection(collection)` | Clear entire collection |
-| `store.flush()` | Sync all pending records |
-| `store.sync(collection)` | Sync one collection only |
-| `store.syncById(collection, id)` | Sync one specific record |
-| `store.onSynced(callback)` | Event: when record synced |
-| `store.onAuthError(callback)` | Event: when sync gets 401/403 |
-| `store.getQueue()` | View pending queue (debug) |
+| `store.save(collection, data, options?)` | Save one record locally and enqueue for sync |
+| `store.getAll(collection)` | Get all records from one collection |
+| `store.getById(collection, id)` | Get one record by internal `_id` |
+| `store.deleteById(collection, id)` | Delete one record by internal `_id` |
+| `store.deleteCollection(collection)` | Delete all records in one collection |
+| `store.flush()` | Sync all pending queue items |
+| `store.sync(collection)` | Sync pending items for one collection only |
+| `store.syncById(collection, id)` | Sync one specific record by internal `_id` |
+| `store.requeueFailed()` | Move `failed` records back to pending queue for retry |
+| `store.onSynced(callback)` | Event callback for successful sync of each item |
+| `store.onAuthError(callback)` | Event callback when sync returns `401` or `403` |
+| `store.onStorageFull(callback)` | Event callback when local storage is full on save |
+| `store.getQueue()` | Inspect in-memory queue items (debug/metrics) |
+| `store.destroy()` | Stop engine, clear queue/storage, and reset singleton |
 
 ## Quick Examples
 
