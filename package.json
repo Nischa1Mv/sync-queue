@@ -1,6 +1,6 @@
 {
   "name": "async-storage-sync",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "description": "Offline-first data layer for React Native with local-first storage and automatic sync",
   "main": "dist/index.js",
   "module": "dist/index.mjs",
