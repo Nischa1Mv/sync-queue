@@ -64,7 +64,7 @@ console.log(`${pending.length} forms waiting to sync`);
 - `autoSync: false`: no automatic syncing; call sync methods manually when you choose.
 - Manual methods:
   - `store.flushWithResult()` → sync all pending and return summary counts
-  - `store.sync(collection)` → sync one collection
+  - `store.syncWithResult(collection)` → sync one collection and return summary counts
   - `store.syncById(collection, id)` → sync one record
 - Sync destination is controlled by your config: `serverUrl + endpoint`.
 
@@ -88,7 +88,7 @@ console.log(`${pending.length} forms waiting to sync`);
 | `store.deleteById(collection, id)` | Delete one record by internal `_id` |
 | `store.deleteCollection(collection)` | Delete all records in one collection |
 | `store.flushWithResult()` | Sync all pending and return detailed summary (`attempted`, `synced`, `failed`, `retried`, `remainingPending`, `items`) |
-| `store.sync(collection)` | Sync pending items for one collection only |
+| `store.syncWithResult(collection)` | Sync collection and return detailed summary (same format as `flushWithResult()`) |
 | `store.syncById(collection, id)` | Sync one specific record by internal `_id` |
 | `store.requeueFailed()` | Move `failed` records back to pending queue for retry |
 | `store.onSynced(callback)` | Event callback for successful sync of each item |

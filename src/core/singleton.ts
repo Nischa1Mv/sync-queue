@@ -194,8 +194,8 @@ export class AsyncStorageSync {
     await this.driver.remove(collectionKey(name));
   }
 
-  async sync(name: string): Promise<void> {
-    await this.engine.flushCollection(name);
+  async syncWithResult(name: string): Promise<FlushResult> {
+    return this.engine.flushCollectionWithResult(name);
   }
 
   async syncById(_name: string, id: string): Promise<void> {

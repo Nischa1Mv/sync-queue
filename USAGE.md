@@ -110,8 +110,9 @@ await store.deleteCollection('old-invoices');
 const result = await store.flushWithResult();
 console.log(result);
 
-// Sync only one collection
-await store.sync('invoices');
+// Sync one collection and get summary output
+const collectionResult = await store.syncWithResult('invoices');
+console.log(collectionResult);
 
 // Sync one specific record by id
 await store.syncById('invoices', 'record-id');

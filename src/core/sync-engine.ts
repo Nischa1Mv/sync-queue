@@ -166,11 +166,44 @@ export class SyncEngine {
     }
   }
 
-  async flushCollection(collectionName: string): Promise<void> {
+  async flushCollectionWithResult(collectionName: string): Promise<FlushResult> {
+    const result: FlushResult = {
+      attempted: 0,
+      synced: 0,
+      failed: 0,
+      retried: 0,
+      deferred: 0,
+      networkErrors: 0,
+      remainingPending: 0,
+      skippedAlreadyFlushing: false,
+      items: [],
+    };
+
     const pending = this.queue.getPendingForCollection(collectionName);
-    for (const item of pending) {
-      await this.syncItem(item);
+    if (pending.length === 0) {
+      result.remainingPending = this.queue.getPendingForCollection(collectionName).length;
+      return result;
     }
+
+    for (const item of pending) {
+      result.attempted += 1;
+      const itemResult = await this.syncItem(item);
+      result.items.push(itemResult);
+      if (itemResult.status === 'synced') {
+        result.synced += 1;
+      } else if (itemResult.status === 'failed') {
+        result.failed += 1;
+      } else if (itemResult.status === 'retried') {
+        result.retried += 1;
+      } else if (itemResult.status === 'deferred-backoff') {
+        result.deferred += 1;
+      } else if (itemResult.status === 'network-error') {
+        result.networkErrors += 1;
+      }
+    }
+
+    result.remainingPending = this.queue.getPendingForCollection(collectionName).length;
+    return result;
   }
 
   async flushRecord(recordId: string): Promise<void> {

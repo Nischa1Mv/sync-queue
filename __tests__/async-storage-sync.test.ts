@@ -231,7 +231,7 @@ describe('AsyncStorageSync', () => {
     expect(secondAfter?._synced).toBe('synced');
   });
 
-  it('sync(collection) only sends queued items for that collection', async () => {
+  it('syncWithResult(collection) only sends queued items for that collection', async () => {
     const fetchMock = vi.fn(async () => ({
       ok: true,
       status: 200,
@@ -248,8 +248,10 @@ describe('AsyncStorageSync', () => {
     const invoice = await store.save('invoices', { amount: 100 });
     const receipt = await store.save('receipts', { amount: 30 });
 
-    await store.sync('invoices');
+    const result = await store.syncWithResult('invoices');
 
+    expect(result.attempted).toBe(1);
+    expect(result.synced).toBe(1);
     expect(fetchMock).toHaveBeenCalledTimes(1);
     const body = JSON.parse(String(fetchMock.mock.calls[0][1]?.body));
     expect(body._id).toBe(invoice._id);
