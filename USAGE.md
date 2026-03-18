@@ -114,6 +114,10 @@ console.log(result);
 const collectionResult = await store.syncWithResult('invoices');
 console.log(collectionResult);
 
+// Sync only selected collections and get one merged summary
+const selectedResult = await store.syncManyWithResult(['invoices', 'receipts']);
+console.log(selectedResult);
+
 // Sync one specific record by id
 await store.syncById('invoices', 'record-id');
 ```
@@ -147,6 +151,7 @@ console.log('Pending queue:', queue);
 - Initialize in app bootstrap.
 - Use collection names by feature (`invoices`, `receipts`, `orders`).
 - Use `flushWithResult()` for manual “Sync now” buttons when you need user-facing success/failure counts.
+- Use `syncManyWithResult([...])` when only a subset of collections should be synced.
 - Handle `onAuthError` globally for `401/403` recovery.
 - Prefer `append` unless you explicitly want single-record-per-type behavior.
 

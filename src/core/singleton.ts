@@ -79,7 +79,7 @@ export class AsyncStorageSync {
       console.log('[AsyncStorageSync] autoSync enabled — starting sync engine');
       instance.engine.start();
     } else {
-      console.log('[AsyncStorageSync] autoSync disabled — call flush() manually');
+      console.log('[AsyncStorageSync] autoSync disabled — call flushWithResult() or syncWithResult(collection) manually');
     }
 
     AsyncStorageSync.instance = instance;
@@ -196,6 +196,10 @@ export class AsyncStorageSync {
 
   async syncWithResult(name: string): Promise<FlushResult> {
     return this.engine.flushCollectionWithResult(name);
+  }
+
+  async syncManyWithResult(names: string[]): Promise<FlushResult> {
+    return this.engine.flushCollectionsWithResult(names);
   }
 
   async syncById(_name: string, id: string): Promise<void> {

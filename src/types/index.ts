@@ -16,6 +16,7 @@ export interface InitConfig {
    */
   payloadTransformer?: (record: Record<string, unknown>) => Record<string, unknown>;
   autoSync?: boolean;
+  autoSyncCollections?: string[];
   endpoint?: string;
   onSyncSuccess?: OnSyncSuccess;
   ttl?: number;
@@ -83,4 +84,5 @@ export type AuthErrorCallback = (statusCode: number, item: QueueItem) => void;
 export type StorageFullCallback = () => void;
 
 /** Fully resolved config with all required fields filled in (payloadTransformer stays optional) */
-export type ResolvedConfig = Required<Omit<InitConfig, 'payloadTransformer'>> & Pick<InitConfig, 'payloadTransformer'>;
+export type ResolvedConfig = Required<Omit<InitConfig, 'payloadTransformer' | 'autoSyncCollections'>> &
+  Pick<InitConfig, 'payloadTransformer' | 'autoSyncCollections'>;

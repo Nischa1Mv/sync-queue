@@ -263,6 +263,40 @@ describe('AsyncStorageSync', () => {
     expect(receiptAfter?._synced).toBe('pending');
   });
 
+  it('syncManyWithResult(collections) only sends queued items for selected collections', async () => {
+    const fetchMock = vi.fn(async () => ({
+      ok: true,
+      status: 200,
+    }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const store = await AsyncStorageSync.init({
+      driver: 'asyncstorage',
+      serverUrl: 'https://api.example.com',
+      credentials: { apiKey: 'k' },
+      onSyncSuccess: 'keep',
+    });
+
+    const invoice = await store.save('invoices', { amount: 100 });
+    const receipt = await store.save('receipts', { amount: 30 });
+    const order = await store.save('orders', { amount: 40 });
+
+    const result = await store.syncManyWithResult(['invoices', 'orders']);
+
+    expect(result.attempted).toBe(2);
+    expect(result.synced).toBe(2);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    const sentIds = fetchMock.mock.calls.map((call) => JSON.parse(String(call[1]?.body))._id).sort();
+    expect(sentIds).toEqual([invoice._id, order._id].sort());
+
+    const invoiceAfter = await store.getById<{ amount: number }>('invoices', invoice._id);
+    const receiptAfter = await store.getById<{ amount: number }>('receipts', receipt._id);
+    const orderAfter = await store.getById<{ amount: number }>('orders', order._id);
+    expect(invoiceAfter?._synced).toBe('synced');
+    expect(orderAfter?._synced).toBe('synced');
+    expect(receiptAfter?._synced).toBe('pending');
+  });
+
   it('maps apiKey credential to Authorization header for backward compatibility', async () => {
     const fetchMock = vi.fn(async () => ({
       ok: true,

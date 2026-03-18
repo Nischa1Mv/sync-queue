@@ -61,10 +61,12 @@ console.log(`${pending.length} forms waiting to sync`);
 
 - `autoSync: true` (default): when the app starts, the package checks connectivity and attempts sync if online.
 - `autoSync: true` also listens for reconnect events and retries pending items automatically.
+- `autoSyncCollections` (optional): when set, auto-sync on reconnect targets only those collections.
 - `autoSync: false`: no automatic syncing; call sync methods manually when you choose.
 - Manual methods:
   - `store.flushWithResult()` → sync all pending and return summary counts
   - `store.syncWithResult(collection)` → sync one collection and return summary counts
+  - `store.syncManyWithResult(collections)` → sync only selected collections and return merged summary counts
   - `store.syncById(collection, id)` → sync one record
 - Sync destination is controlled by your config: `serverUrl + endpoint`.
 
@@ -89,6 +91,7 @@ console.log(`${pending.length} forms waiting to sync`);
 | `store.deleteCollection(collection)` | Delete all records in one collection |
 | `store.flushWithResult()` | Sync all pending and return detailed summary (`attempted`, `synced`, `failed`, `retried`, `remainingPending`, `items`) |
 | `store.syncWithResult(collection)` | Sync collection and return detailed summary (same format as `flushWithResult()`) |
+| `store.syncManyWithResult(collections)` | Sync selected collections and return one merged summary (same format as `flushWithResult()`) |
 | `store.syncById(collection, id)` | Sync one specific record by internal `_id` |
 | `store.requeueFailed()` | Move `failed` records back to pending queue for retry |
 | `store.onSynced(callback)` | Event callback for successful sync of each item |
@@ -176,6 +179,7 @@ initSyncQueue({
   credentials: Record<string, string>, // (required) merged into request headers
   endpoint?: '/submit',             // route to POST data
   autoSync?: false,                 // auto-sync on reconnect
+  autoSyncCollections?: ['invoices', 'payments'], // optional: only these collections auto-sync on reconnect
   onSyncSuccess?: 'keep',           // after sync: keep|delete|ttl
   ttl?: 7 * 24 * 60 * 60 * 1000,   // if ttl mode, keep duration
   duplicateStrategy?: 'append',     // append or overwrite

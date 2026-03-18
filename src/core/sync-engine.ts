@@ -101,8 +101,58 @@ export class SyncEngine {
       clearTimeout(this.debounceTimer);
     }
     this.debounceTimer = setTimeout(() => {
-      void this.flushWithResult();
+      void this.flushAutoSyncTargetWithResult();
     }, DEBOUNCE_MS);
+  }
+
+  private async flushAutoSyncTargetWithResult(): Promise<FlushResult> {
+    const configuredCollections = this.config.autoSyncCollections
+      ?.map((name) => name.trim())
+      .filter((name) => name.length > 0);
+
+    if (!configuredCollections || configuredCollections.length === 0) {
+      return this.flushWithResult();
+    }
+
+    return this.flushCollectionsWithResult(configuredCollections);
+  }
+
+  private createEmptyResult(): FlushResult {
+    return {
+      attempted: 0,
+      synced: 0,
+      failed: 0,
+      retried: 0,
+      deferred: 0,
+      networkErrors: 0,
+      remainingPending: 0,
+      skippedAlreadyFlushing: false,
+      items: [],
+    };
+  }
+
+  private mergeResult(target: FlushResult, source: FlushResult): void {
+    target.attempted += source.attempted;
+    target.synced += source.synced;
+    target.failed += source.failed;
+    target.retried += source.retried;
+    target.deferred += source.deferred;
+    target.networkErrors += source.networkErrors;
+    target.items.push(...source.items);
+    target.remainingPending = source.remainingPending;
+    target.skippedAlreadyFlushing = target.skippedAlreadyFlushing || source.skippedAlreadyFlushing;
+  }
+
+  async flushCollectionsWithResult(collectionNames: string[]): Promise<FlushResult> {
+    const result = this.createEmptyResult();
+
+    for (const collectionName of collectionNames) {
+      const collectionResult = await this.flushCollectionWithResult(collectionName);
+      this.mergeResult(result, collectionResult);
+    }
+
+    result.remainingPending = this.queue.getPending().length;
+    return result;
   }
 
   async flushWithResult(): Promise<FlushResult> {
@@ -122,17 +172,7 @@ export class SyncEngine {
     }
     this.isFlushing = true;
 
-    const result: FlushResult = {
-      attempted: 0,
-      synced: 0,
-      failed: 0,
-      retried: 0,
-      deferred: 0,
-      networkErrors: 0,
-      remainingPending: 0,
-      skippedAlreadyFlushing: false,
-      items: [],
-    };
+    const result: FlushResult = this.createEmptyResult();
 
     try {
       const pending = this.queue.getPending();
@@ -167,43 +207,52 @@ export class SyncEngine {
   }
 
   async flushCollectionWithResult(collectionName: string): Promise<FlushResult> {
-    const result: FlushResult = {
-      attempted: 0,
-      synced: 0,
-      failed: 0,
-      retried: 0,
-      deferred: 0,
-      networkErrors: 0,
-      remainingPending: 0,
-      skippedAlreadyFlushing: false,
-      items: [],
-    };
+    if (this.isFlushing) {
+      return {
+        attempted: 0,
+        synced: 0,
+        failed: 0,
+        retried: 0,
+        deferred: 0,
+        networkErrors: 0,
+        remainingPending: this.queue.getPendingForCollection(collectionName).length,
+        skippedAlreadyFlushing: true,
+        items: [],
+      };
+    }
+    this.isFlushing = true;
 
-    const pending = this.queue.getPendingForCollection(collectionName);
-    if (pending.length === 0) {
+    const result: FlushResult = this.createEmptyResult();
+
+    try {
+      const pending = this.queue.getPendingForCollection(collectionName);
+      if (pending.length === 0) {
+        result.remainingPending = this.queue.getPendingForCollection(collectionName).length;
+        return result;
+      }
+
+      for (const item of pending) {
+        result.attempted += 1;
+        const itemResult = await this.syncItem(item);
+        result.items.push(itemResult);
+        if (itemResult.status === 'synced') {
+          result.synced += 1;
+        } else if (itemResult.status === 'failed') {
+          result.failed += 1;
+        } else if (itemResult.status === 'retried') {
+          result.retried += 1;
+        } else if (itemResult.status === 'deferred-backoff') {
+          result.deferred += 1;
+        } else if (itemResult.status === 'network-error') {
+          result.networkErrors += 1;
+        }
+      }
+
       result.remainingPending = this.queue.getPendingForCollection(collectionName).length;
       return result;
+    } finally {
+      this.isFlushing = false;
     }
-
-    for (const item of pending) {
-      result.attempted += 1;
-      const itemResult = await this.syncItem(item);
-      result.items.push(itemResult);
-      if (itemResult.status === 'synced') {
-        result.synced += 1;
-      } else if (itemResult.status === 'failed') {
-        result.failed += 1;
-      } else if (itemResult.status === 'retried') {
-        result.retried += 1;
-      } else if (itemResult.status === 'deferred-backoff') {
-        result.deferred += 1;
-      } else if (itemResult.status === 'network-error') {
-        result.networkErrors += 1;
-      }
-    }
-
-    result.remainingPending = this.queue.getPendingForCollection(collectionName).length;
-    return result;
   }
 
   async flushRecord(recordId: string): Promise<void> {
