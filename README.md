@@ -110,6 +110,15 @@ const all = await store.getAll('invoices');
 const one = await store.getById('invoices', all[0].meta.id);
 ```
 
+Using the helper export:
+
+```ts
+import { getTypedSyncQueue } from 'async-storage-sync';
+
+type Invoice = { invoiceNo: string; amount: number };
+const store = getTypedSyncQueue<Invoice>();
+```
+
 ### Record shape
 
 ```ts
@@ -160,3 +169,4 @@ queue.onStorageFull(() => {
 - Queue payload and collection records are persisted across app restarts.
 - Max 5 retries per record with exponential backoff for 5xx errors.
 - `getSyncQueue()` throws if not initialized yet; use `ensureInitialized(config)` for boot-safe access.
+- `ensureInitialized()` without config works only after first init; otherwise pass config.
