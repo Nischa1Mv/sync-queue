@@ -30,6 +30,7 @@ function collectionKey(name: string): string {
 
 const DEFAULTS = {
   autoSync: true,
+  syncOnSave: false,
   endpoint: '/sync',
   onSyncSuccess: 'keep' as const,
   ttl: 7 * 24 * 60 * 60 * 1000,
@@ -75,6 +76,7 @@ export class AsyncStorageSync {
 
     const fullConfig: ResolvedConfig = {
       autoSync: DEFAULTS.autoSync,
+      syncOnSave: DEFAULTS.syncOnSave,
       endpoint: DEFAULTS.endpoint,
       onSyncSuccess: DEFAULTS.onSyncSuccess,
       ttl: DEFAULTS.ttl,
@@ -152,6 +154,9 @@ export class AsyncStorageSync {
         records[existingIndex] = updated;
         await this.saveCollection(name, records);
         await this.enqueueRecord(name, updated, options);
+        if (this.config.syncOnSave) {
+          this.engine.triggerFlushSoon();
+        }
         return updated;
       }
     }
@@ -180,6 +185,9 @@ export class AsyncStorageSync {
     }
 
     await this.enqueueRecord(name, record, options);
+    if (this.config.syncOnSave) {
+      this.engine.triggerFlushSoon();
+    }
     return record;
   }
 

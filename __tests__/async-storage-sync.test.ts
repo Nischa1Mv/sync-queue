@@ -64,6 +64,61 @@ describe('AsyncStorageSync', () => {
     expect(store).toBe(same);
   });
 
+  it('syncOnSave triggers debounced best-effort flush after save', async () => {
+    vi.useFakeTimers();
+    try {
+      const fetchMock = vi.fn(async () => ({
+        ok: true,
+        status: 200,
+      }));
+      vi.stubGlobal('fetch', fetchMock);
+
+      const store = await AsyncStorageSync.init({
+        driver: 'asyncstorage',
+        serverUrl: 'https://api.example.com',
+        credentials: { apiKey: 'k' },
+        autoSync: false,
+        syncOnSave: true,
+        onSyncSuccess: 'keep',
+      });
+
+      await store.save('invoices', { amount: 111 });
+      expect(fetchMock).toHaveBeenCalledTimes(0);
+
+      await vi.advanceTimersByTimeAsync(600);
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('does not flush on save by default', async () => {
+    vi.useFakeTimers();
+    try {
+      const fetchMock = vi.fn(async () => ({
+        ok: true,
+        status: 200,
+      }));
+      vi.stubGlobal('fetch', fetchMock);
+
+      const store = await AsyncStorageSync.init({
+        driver: 'asyncstorage',
+        serverUrl: 'https://api.example.com',
+        credentials: { apiKey: 'k' },
+        autoSync: false,
+        onSyncSuccess: 'keep',
+      });
+
+      await store.save('invoices', { amount: 222 });
+      await vi.advanceTimersByTimeAsync(600);
+      expect(fetchMock).toHaveBeenCalledTimes(0);
+    } finally {
+      vi.useRealTimers();
+      vi.unstubAllGlobals();
+    }
+  });
+
   it('returns same singleton instance after init()', async () => {
     const first = await AsyncStorageSync.init({
       driver: 'asyncstorage',

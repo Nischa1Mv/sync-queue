@@ -95,6 +95,10 @@ export class SyncEngine {
     }
   }
 
+  triggerFlushSoon(): void {
+    this.scheduleFlush();
+  }
+
   private scheduleFlush(): void {
     console.log('[SyncEngine] scheduleFlush() — debounce', DEBOUNCE_MS, 'ms');
     if (this.debounceTimer) {

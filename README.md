@@ -20,6 +20,7 @@ await initSyncQueue({
   endpoint: '/submit',
   idResolver: (item) => String(item.id ?? ''),
   autoSync: true,
+  syncOnSave: true,
 });
 
 type Submission = {
@@ -75,6 +76,7 @@ initSyncQueue({
 
   endpoint: '/submit',
   autoSync: true,
+  syncOnSave: true,
   autoSyncCollections: ['submissions'],
 
   onSyncSuccess: 'delete',
@@ -170,3 +172,9 @@ queue.onStorageFull(() => {
 - Max 5 retries per record with exponential backoff for 5xx errors.
 - `getSyncQueue()` throws if not initialized yet; use `ensureInitialized(config)` for boot-safe access.
 - `ensureInitialized()` without config works only after first init; otherwise pass config.
+
+## Sync Modes
+
+- `autoSync`: sync on connectivity/app-open signals (NetInfo-driven behavior).
+- `syncOnSave`: schedule immediate debounced best-effort sync after each `save()`.
+- Use both for most apps: `autoSync` handles reconnects, `syncOnSave` reduces delay when already online.

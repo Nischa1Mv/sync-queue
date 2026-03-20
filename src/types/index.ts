@@ -20,6 +20,11 @@ export interface InitConfig {
    */
   payloadTransformer?: (record: Record<string, unknown>) => Record<string, unknown>;
   autoSync?: boolean;
+  /**
+   * If enabled, each successful save schedules a debounced best-effort sync.
+   * This complements autoSync and does not replace connectivity-based triggers.
+   */
+  syncOnSave?: boolean;
   autoSyncCollections?: string[];
   endpoint?: string;
   onSyncSuccess?: OnSyncSuccess;
