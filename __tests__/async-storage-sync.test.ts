@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { AsyncStorageSync } from '../src';
+import { AsyncStorageSync, ensureInitialized, isInitialized } from '../src';
 
 type MemStore = Map<string, string>;
 
@@ -35,6 +35,33 @@ describe('AsyncStorageSync', () => {
 
   it('throws if getInstance() is called before init()', () => {
     expect(() => AsyncStorageSync.getInstance()).toThrow();
+  });
+
+  it('exposes initialization state', async () => {
+    expect(isInitialized()).toBe(false);
+
+    await AsyncStorageSync.init({
+      driver: 'asyncstorage',
+      serverUrl: 'https://api.example.com',
+      credentials: { apiKey: 'k' },
+    });
+
+    expect(isInitialized()).toBe(true);
+  });
+
+  it('ensureInitialized throws without config when not initialized', async () => {
+    await expect(ensureInitialized()).rejects.toThrow('Queue is not initialized');
+  });
+
+  it('ensureInitialized initializes when config is provided', async () => {
+    const store = await ensureInitialized({
+      driver: 'asyncstorage',
+      serverUrl: 'https://api.example.com',
+      credentials: { apiKey: 'k' },
+    });
+
+    const same = await ensureInitialized();
+    expect(store).toBe(same);
   });
 
   it('returns same singleton instance after init()', async () => {

@@ -96,10 +96,28 @@ export class AsyncStorageSync {
     return instance;
   }
 
+  static isInitialized(): boolean {
+    return AsyncStorageSync.instance !== null;
+  }
+
+  static async ensureInitialized(config?: InitConfig): Promise<AsyncStorageSync> {
+    if (AsyncStorageSync.instance) {
+      return AsyncStorageSync.instance;
+    }
+
+    if (!config) {
+      throw new Error(
+        '[async-storage-sync] Queue is not initialized. Call initSyncQueue(config) during app bootstrap, or call ensureInitialized(config) before using getSyncQueue().'
+      );
+    }
+
+    return AsyncStorageSync.init(config);
+  }
+
   static getInstance(): AsyncStorageSync {
     if (!AsyncStorageSync.instance) {
       throw new Error(
-        '[async-storage-sync] getInstance() called before init(). Call AsyncStorageSync.init(...) first.'
+        '[async-storage-sync] getInstance() called before initialization. Recovery: await initSyncQueue(config) at startup, or await ensureInitialized(config) before accessing the queue.'
       );
     }
     return AsyncStorageSync.instance;

@@ -43,6 +43,18 @@ const result = await store.flushWithResult();
 console.log(`Synced: ${result.synced}, Failed: ${result.failed}`);
 ```
 
+If queue access may happen during startup (for example from screens/services), use:
+
+```ts
+import { ensureInitialized } from 'async-storage-sync';
+
+await ensureInitialized({
+  driver: 'asyncstorage',
+  serverUrl: 'https://api.example.com',
+  credentials: { Authorization: 'Token abc123' },
+});
+```
+
 ## What Changed
 
 - Generic API: `save<T>()`, `getAll<T>()`, `getById<T>()`, `flushWithResult<T>()`.
@@ -80,6 +92,8 @@ initSyncQueue({
 
 ```ts
 initSyncQueue(config)
+isInitialized()
+ensureInitialized(config?)
 getSyncQueue()
 getTypedSyncQueue<T>()
 ```
@@ -145,3 +159,4 @@ queue.onStorageFull(() => {
 - `payloadTransformer` receives only your payload (`record.data`), not metadata.
 - Queue payload and collection records are persisted across app restarts.
 - Max 5 retries per record with exponential backoff for 5xx errors.
+- `getSyncQueue()` throws if not initialized yet; use `ensureInitialized(config)` for boot-safe access.

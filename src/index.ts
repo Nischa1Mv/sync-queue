@@ -11,16 +11,25 @@ let initPromise: Promise<AsyncStorageSync> | null = null;
  * Initialize once at app startup (safe to call repeatedly).
  */
 export async function initSyncQueue(config: InitConfig): Promise<AsyncStorageSync> {
-  try {
-    return AsyncStorageSync.getInstance();
-  } catch {
-    if (!initPromise) {
-      initPromise = AsyncStorageSync.init(config).finally(() => {
-        initPromise = null;
-      });
-    }
-    return initPromise;
+  if (!initPromise) {
+    initPromise = AsyncStorageSync.ensureInitialized(config).finally(() => {
+      initPromise = null;
+    });
   }
+  return initPromise;
+}
+
+export function isInitialized(): boolean {
+  return AsyncStorageSync.isInitialized();
+}
+
+export async function ensureInitialized(config?: InitConfig): Promise<AsyncStorageSync> {
+  if (!initPromise) {
+    initPromise = AsyncStorageSync.ensureInitialized(config).finally(() => {
+      initPromise = null;
+    });
+  }
+  return initPromise;
 }
 
 /**
