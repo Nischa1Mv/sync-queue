@@ -117,7 +117,7 @@ export class SyncEngine {
     return this.flushCollectionsWithResult(configuredCollections);
   }
 
-  private createEmptyResult(): FlushResult {
+  private createEmptyResult<T extends Record<string, unknown> = Record<string, unknown>>(): FlushResult<T> {
     return {
       attempted: 0,
       synced: 0,
@@ -131,7 +131,10 @@ export class SyncEngine {
     };
   }
 
-  private mergeResult(target: FlushResult, source: FlushResult): void {
+  private mergeResult<T extends Record<string, unknown> = Record<string, unknown>>(
+    target: FlushResult<T>,
+    source: FlushResult<T>
+  ): void {
     target.attempted += source.attempted;
     target.synced += source.synced;
     target.failed += source.failed;
@@ -143,11 +146,13 @@ export class SyncEngine {
     target.skippedAlreadyFlushing = target.skippedAlreadyFlushing || source.skippedAlreadyFlushing;
   }
 
-  async flushCollectionsWithResult(collectionNames: string[]): Promise<FlushResult> {
-    const result = this.createEmptyResult();
+  async flushCollectionsWithResult<T extends Record<string, unknown> = Record<string, unknown>>(
+    collectionNames: string[]
+  ): Promise<FlushResult<T>> {
+    const result = this.createEmptyResult<T>();
 
     for (const collectionName of collectionNames) {
-      const collectionResult = await this.flushCollectionWithResult(collectionName);
+      const collectionResult = await this.flushCollectionWithResult<T>(collectionName);
       this.mergeResult(result, collectionResult);
     }
 
@@ -155,7 +160,9 @@ export class SyncEngine {
     return result;
   }
 
-  async flushWithResult(): Promise<FlushResult> {
+  async flushWithResult<T extends Record<string, unknown> = Record<string, unknown>>(): Promise<
+    FlushResult<T>
+  > {
     if (this.isFlushing) {
       console.log('[SyncEngine] flush() skipped — already flushing');
       return {
@@ -172,7 +179,7 @@ export class SyncEngine {
     }
     this.isFlushing = true;
 
-    const result: FlushResult = this.createEmptyResult();
+    const result: FlushResult<T> = this.createEmptyResult<T>();
 
     try {
       const pending = this.queue.getPending();
@@ -184,7 +191,7 @@ export class SyncEngine {
       }
       for (const item of pending) {
         result.attempted += 1;
-        const itemResult = await this.syncItem(item);
+        const itemResult = await this.syncItem<T>(item);
         result.items.push(itemResult);
         if (itemResult.status === 'synced') {
           result.synced += 1;
@@ -206,7 +213,9 @@ export class SyncEngine {
     }
   }
 
-  async flushCollectionWithResult(collectionName: string): Promise<FlushResult> {
+  async flushCollectionWithResult<T extends Record<string, unknown> = Record<string, unknown>>(
+    collectionName: string
+  ): Promise<FlushResult<T>> {
     if (this.isFlushing) {
       return {
         attempted: 0,
@@ -222,7 +231,7 @@ export class SyncEngine {
     }
     this.isFlushing = true;
 
-    const result: FlushResult = this.createEmptyResult();
+    const result: FlushResult<T> = this.createEmptyResult<T>();
 
     try {
       const pending = this.queue.getPendingForCollection(collectionName);
@@ -233,7 +242,7 @@ export class SyncEngine {
 
       for (const item of pending) {
         result.attempted += 1;
-        const itemResult = await this.syncItem(item);
+        const itemResult = await this.syncItem<T>(item);
         result.items.push(itemResult);
         if (itemResult.status === 'synced') {
           result.synced += 1;
@@ -262,7 +271,9 @@ export class SyncEngine {
     }
   }
 
-  private async syncItem(item: QueueItem): Promise<FlushItemResult> {
+  private async syncItem<T extends Record<string, unknown> = Record<string, unknown>>(
+    item: QueueItem
+  ): Promise<FlushItemResult<T>> {
     if (item.retries > 0) {
       const backoffMs = Math.pow(2, item.retries) * BACKOFF_BASE_MS;
       const elapsed = Date.now() - item.ts;
@@ -280,8 +291,9 @@ export class SyncEngine {
     try {
       const url = `${this.config.serverUrl}${this.config.endpoint}`;
       console.log(`[SyncEngine] 📤 POST ${url} — key: ${item.key}, recordId: ${item.recordId}`);
-      const raw: Record<string, unknown> = JSON.parse(item.payload);
-      const body = this.config.payloadTransformer ? this.config.payloadTransformer(raw) : raw;
+      const storedRecord = JSON.parse(item.payload) as StoredRecord<T>;
+      const payload = storedRecord.data as Record<string, unknown>;
+      const body = this.config.payloadTransformer ? this.config.payloadTransformer(payload) : payload;
 
       const response = await fetch(url, {
         method: 'POST',
@@ -301,6 +313,7 @@ export class SyncEngine {
           recordId: item.recordId,
           status: 'synced',
           httpStatus: response.status,
+          record: storedRecord,
         };
       } else if (response.status >= 400 && response.status < 500) {
         await this.handleClientError(item, response.status);
@@ -310,6 +323,7 @@ export class SyncEngine {
           recordId: item.recordId,
           status: 'failed',
           httpStatus: response.status,
+          record: storedRecord,
         };
       } else if (response.status >= 500) {
         await this.handleServerError(item);
@@ -319,6 +333,7 @@ export class SyncEngine {
           recordId: item.recordId,
           status: 'retried',
           httpStatus: response.status,
+          record: storedRecord,
         };
       }
 
@@ -328,6 +343,7 @@ export class SyncEngine {
         recordId: item.recordId,
         status: 'failed',
         httpStatus: response.status,
+        record: storedRecord,
       };
     } catch (e) {
       console.warn('[SyncEngine] 🔌 Network error (offline?) — will retry on next flush:', e);
@@ -388,16 +404,16 @@ export class SyncEngine {
     status: 'synced' | 'failed'
   ): Promise<void> {
     const records = await this.getCollection(collectionName);
-    const index = records.findIndex((record) => record._id === recordId);
+    const index = records.findIndex((record) => record.meta.id === recordId);
     if (index !== -1) {
-      records[index]._synced = status;
+      records[index].meta.synced = status;
       await this.saveCollection(collectionName, records);
     }
   }
 
   private async removeRecordFromCollection(collectionName: string, recordId: string): Promise<void> {
     const records = await this.getCollection(collectionName);
-    const filtered = records.filter((record) => record._id !== recordId);
+    const filtered = records.filter((record) => record.meta.id !== recordId);
     await this.saveCollection(collectionName, filtered);
   }
 

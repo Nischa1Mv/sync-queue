@@ -57,11 +57,11 @@ describe('AsyncStorageSync', () => {
 
     const saved = await store.save('invoices', { amount: 99 });
     const all = await store.getAll<{ amount: number }>('invoices');
-    const found = await store.getById<{ amount: number }>('invoices', saved._id);
+    const found = await store.getById<{ amount: number }>('invoices', saved.meta.id);
 
     expect(all).toHaveLength(1);
-    expect(all[0].amount).toBe(99);
-    expect(found?._id).toBe(saved._id);
+    expect(all[0].data.amount).toBe(99);
+    expect(found?.meta.id).toBe(saved.meta.id);
     expect(store.getQueue()).toHaveLength(1);
   });
 
@@ -78,7 +78,7 @@ describe('AsyncStorageSync', () => {
 
     const all = await store.getAll<{ amount: number }>('invoices');
     expect(all).toHaveLength(1);
-    expect(all[0].amount).toBe(20);
+    expect(all[0].data.amount).toBe(20);
   });
 
   it('flushWithResult marks queue item synced when server returns 200', async () => {
@@ -100,8 +100,8 @@ describe('AsyncStorageSync', () => {
     const record = await store.save('invoices', { amount: 11 });
     await store.flushWithResult();
 
-    const refreshed = await store.getById<{ amount: number }>('invoices', record._id);
-    expect(refreshed?._synced).toBe('synced');
+    const refreshed = await store.getById<{ amount: number }>('invoices', record.meta.id);
+    expect(refreshed?.meta.synced).toBe('synced');
     expect(store.getQueue()[0]?.synced).toBe(true);
 
     vi.unstubAllGlobals();
@@ -169,7 +169,7 @@ describe('AsyncStorageSync', () => {
     const record = await store.save('invoices', { amount: 50 });
     await store.flushWithResult();
 
-    const deleted = await store.getById<{ amount: number }>('invoices', record._id);
+    const deleted = await store.getById<{ amount: number }>('invoices', record.meta.id);
     expect(deleted).toBeNull();
     expect(store.getQueue()[0]?.synced).toBe(true);
   });
@@ -195,10 +195,10 @@ describe('AsyncStorageSync', () => {
     const record = await store.save('invoices', { amount: 70 });
     await store.flushWithResult();
 
-    const failed = await store.getById<{ amount: number }>('invoices', record._id);
+    const failed = await store.getById<{ amount: number }>('invoices', record.meta.id);
     expect(onAuthError).toHaveBeenCalledTimes(1);
-    expect(onAuthError).toHaveBeenCalledWith(401, expect.objectContaining({ recordId: record._id }));
-    expect(failed?._synced).toBe('failed');
+    expect(onAuthError).toHaveBeenCalledWith(401, expect.objectContaining({ recordId: record.meta.id }));
+    expect(failed?.meta.synced).toBe('failed');
     expect(store.getQueue()).toHaveLength(0);
   });
 
@@ -219,16 +219,16 @@ describe('AsyncStorageSync', () => {
     const first = await store.save('invoices', { amount: 10 });
     const second = await store.save('invoices', { amount: 20 });
 
-    await store.syncById('invoices', second._id);
+    await store.syncById('invoices', second.meta.id);
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
     const body = JSON.parse(String(fetchMock.mock.calls[0][1]?.body));
-    expect(body._id).toBe(second._id);
+    expect(body.amount).toBe(second.data.amount);
 
-    const firstAfter = await store.getById<{ amount: number }>('invoices', first._id);
-    const secondAfter = await store.getById<{ amount: number }>('invoices', second._id);
-    expect(firstAfter?._synced).toBe('pending');
-    expect(secondAfter?._synced).toBe('synced');
+    const firstAfter = await store.getById<{ amount: number }>('invoices', first.meta.id);
+    const secondAfter = await store.getById<{ amount: number }>('invoices', second.meta.id);
+    expect(firstAfter?.meta.synced).toBe('pending');
+    expect(secondAfter?.meta.synced).toBe('synced');
   });
 
   it('syncWithResult(collection) only sends queued items for that collection', async () => {
@@ -254,13 +254,13 @@ describe('AsyncStorageSync', () => {
     expect(result.synced).toBe(1);
     expect(fetchMock).toHaveBeenCalledTimes(1);
     const body = JSON.parse(String(fetchMock.mock.calls[0][1]?.body));
-    expect(body._id).toBe(invoice._id);
+    expect(body.amount).toBe(invoice.data.amount);
     expect(body.amount).toBe(100);
 
-    const invoiceAfter = await store.getById<{ amount: number }>('invoices', invoice._id);
-    const receiptAfter = await store.getById<{ amount: number }>('receipts', receipt._id);
-    expect(invoiceAfter?._synced).toBe('synced');
-    expect(receiptAfter?._synced).toBe('pending');
+    const invoiceAfter = await store.getById<{ amount: number }>('invoices', invoice.meta.id);
+    const receiptAfter = await store.getById<{ amount: number }>('receipts', receipt.meta.id);
+    expect(invoiceAfter?.meta.synced).toBe('synced');
+    expect(receiptAfter?.meta.synced).toBe('pending');
   });
 
   it('syncManyWithResult(collections) only sends queued items for selected collections', async () => {
@@ -286,15 +286,15 @@ describe('AsyncStorageSync', () => {
     expect(result.attempted).toBe(2);
     expect(result.synced).toBe(2);
     expect(fetchMock).toHaveBeenCalledTimes(2);
-    const sentIds = fetchMock.mock.calls.map((call) => JSON.parse(String(call[1]?.body))._id).sort();
-    expect(sentIds).toEqual([invoice._id, order._id].sort());
+    const sentAmounts = fetchMock.mock.calls.map((call) => JSON.parse(String(call[1]?.body)).amount).sort();
+    expect(sentAmounts).toEqual([invoice.data.amount, order.data.amount].sort());
 
-    const invoiceAfter = await store.getById<{ amount: number }>('invoices', invoice._id);
-    const receiptAfter = await store.getById<{ amount: number }>('receipts', receipt._id);
-    const orderAfter = await store.getById<{ amount: number }>('orders', order._id);
-    expect(invoiceAfter?._synced).toBe('synced');
-    expect(orderAfter?._synced).toBe('synced');
-    expect(receiptAfter?._synced).toBe('pending');
+    const invoiceAfter = await store.getById<{ amount: number }>('invoices', invoice.meta.id);
+    const receiptAfter = await store.getById<{ amount: number }>('receipts', receipt.meta.id);
+    const orderAfter = await store.getById<{ amount: number }>('orders', order.meta.id);
+    expect(invoiceAfter?.meta.synced).toBe('synced');
+    expect(orderAfter?.meta.synced).toBe('synced');
+    expect(receiptAfter?.meta.synced).toBe('pending');
   });
 
   it('maps apiKey credential to Authorization header for backward compatibility', async () => {

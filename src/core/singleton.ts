@@ -5,6 +5,7 @@ import type {
   ResolvedConfig,
   SaveOptions,
   StoredRecord,
+  SyncStore,
   QueueItem,
   FlushResult,
   SyncedCallback,
@@ -34,6 +35,15 @@ const DEFAULTS = {
   ttl: 7 * 24 * 60 * 60 * 1000,
   duplicateStrategy: 'append' as const,
 };
+
+function resolveRecordId(
+  data: Record<string, unknown>,
+  resolver?: (item: Record<string, unknown>) => string
+): string {
+  if (!resolver) return generateId();
+  const resolved = resolver(data);
+  return resolved && resolved.trim().length > 0 ? resolved : generateId();
+}
 
 export class AsyncStorageSync {
   private static instance: AsyncStorageSync | null = null;
@@ -108,16 +118,18 @@ export class AsyncStorageSync {
     const records = await this.getCollection<T>(name);
 
     if (strategy === 'overwrite') {
-      const existingIndex = records.findIndex((record) => record._type === type);
+      const existingIndex = records.findIndex((record) => record.meta.type === type);
       if (existingIndex !== -1) {
         const existing = records[existingIndex];
         const updated: StoredRecord<T> = {
-          ...existing,
-          ...data,
-          _ts: Date.now(),
-          _synced: 'pending',
-          _type: type,
-        } as StoredRecord<T>;
+          meta: {
+            ...existing.meta,
+            ts: Date.now(),
+            synced: 'pending',
+            type,
+          },
+          data,
+        };
 
         records[existingIndex] = updated;
         await this.saveCollection(name, records);
@@ -127,13 +139,15 @@ export class AsyncStorageSync {
     }
 
     const record: StoredRecord<T> = {
-      ...data,
-      _id: generateId(),
-      _ts: Date.now(),
-      _synced: 'pending',
-      _type: type,
-      _retries: 0,
-    } as StoredRecord<T>;
+      meta: {
+        id: resolveRecordId(data, this.config.idResolver),
+        ts: Date.now(),
+        synced: 'pending',
+        type,
+        retries: 0,
+      },
+      data,
+    };
 
     records.push(record);
 
@@ -159,7 +173,7 @@ export class AsyncStorageSync {
     const queueItem: QueueItem = {
       id: generateId(),
       key: name,
-      recordId: record._id,
+      recordId: record.meta.id,
       payload: JSON.stringify(record),
       endpoint: this.config.endpoint,
       ts: Date.now(),
@@ -179,14 +193,14 @@ export class AsyncStorageSync {
     id: string
   ): Promise<StoredRecord<T> | null> {
     const records = await this.getCollection<T>(name);
-    return records.find((record) => record._id === id) ?? null;
+    return records.find((record) => record.meta.id === id) ?? null;
   }
 
   async deleteById(name: string, id: string): Promise<void> {
     const records = await this.getCollection(name);
     await this.saveCollection(
       name,
-      records.filter((record) => record._id !== id)
+      records.filter((record) => record.meta.id !== id)
     );
   }
 
@@ -194,11 +208,15 @@ export class AsyncStorageSync {
     await this.driver.remove(collectionKey(name));
   }
 
-  async syncWithResult(name: string): Promise<FlushResult> {
+  async syncWithResult<T extends Record<string, unknown> = Record<string, unknown>>(
+    name: string
+  ): Promise<FlushResult<T>> {
     return this.engine.flushCollectionWithResult(name);
   }
 
-  async syncManyWithResult(names: string[]): Promise<FlushResult> {
+  async syncManyWithResult<T extends Record<string, unknown> = Record<string, unknown>>(
+    names: string[]
+  ): Promise<FlushResult<T>> {
     return this.engine.flushCollectionsWithResult(names);
   }
 
@@ -206,8 +224,19 @@ export class AsyncStorageSync {
     await this.engine.flushRecord(id);
   }
 
-  async flushWithResult(): Promise<FlushResult> {
+  async flushWithResult<T extends Record<string, unknown> = Record<string, unknown>>(): Promise<
+    FlushResult<T>
+  > {
     return this.engine.flushWithResult();
+  }
+
+  asType<T extends Record<string, unknown>>(): SyncStore<T> {
+    return {
+      save: (collection, item, options) => this.save<T>(collection, item, options),
+      getAll: (collection) => this.getAll<T>(collection),
+      getById: (collection, id) => this.getById<T>(collection, id),
+      flushWithResult: () => this.flushWithResult<T>(),
+    };
   }
 
   /**
@@ -225,13 +254,13 @@ export class AsyncStorageSync {
       if (!raw) continue;
 
       const records: StoredRecord[] = JSON.parse(raw);
-      const failed = records.filter((r) => r._synced === 'failed');
+      const failed = records.filter((r) => r.meta.synced === 'failed');
 
       for (const record of failed) {
         const queueItem: QueueItem = {
           id: generateId(),
           key: collectionName,
-          recordId: record._id,
+          recordId: record.meta.id,
           payload: JSON.stringify(record),
           endpoint: this.config.endpoint,
           ts: Date.now(),
@@ -240,7 +269,7 @@ export class AsyncStorageSync {
         };
         await this.queue.enqueue(queueItem);
         // Reset status to pending
-        record._synced = 'pending';
+        record.meta.synced = 'pending';
         total++;
       }
 

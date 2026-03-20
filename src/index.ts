@@ -3,6 +3,7 @@ import { AsyncStorageSync } from './core/singleton';
 import { AsyncStorageDriver } from './drivers/AsyncStorageDriver';
 import type { InitConfig } from './types';
 import type { AsyncStorageClient } from './drivers/AsyncStorageDriver';
+import type { SyncStore } from './types';
 
 let initPromise: Promise<AsyncStorageSync> | null = null;
 
@@ -29,6 +30,10 @@ export function getSyncQueue(): AsyncStorageSync {
   return AsyncStorageSync.getInstance();
 }
 
+export function getTypedSyncQueue<T extends Record<string, unknown>>(): SyncStore<T> {
+  return AsyncStorageSync.getInstance().asType<T>();
+}
+
 /**
  * Inject storage implementation explicitly (recommended for symlink/local package usage).
  */
@@ -42,6 +47,7 @@ export type {
   SaveOptions,
   StoredRecord,
   RecordMeta,
+  SyncStore,
   QueueItem,
   FlushResult,
   FlushItemResult,
