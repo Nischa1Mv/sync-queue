@@ -1,17 +1,17 @@
-# async-storage-sync
+# @aegiondynamic/async-storage-sync
 
 Offline-first queue for React Native with type-safe payloads and automatic sync.
 
 ## Install
 
 ```bash
-npm install async-storage-sync @react-native-async-storage/async-storage @react-native-community/netinfo
+npm install @aegiondynamic/async-storage-sync @react-native-async-storage/async-storage @react-native-community/netinfo
 ```
 
 ## Quick Start
 
 ```ts
-import { initSyncQueue, getSyncQueue } from 'async-storage-sync';
+import { initSyncQueue, getSyncQueue } from '@aegiondynamic/async-storage-sync';
 
 await initSyncQueue({
   driver: 'asyncstorage',
@@ -47,7 +47,7 @@ console.log(`Synced: ${result.synced}, Failed: ${result.failed}`);
 If queue access may happen during startup (for example from screens/services), use:
 
 ```ts
-import { ensureInitialized } from 'async-storage-sync';
+import { ensureInitialized } from '@aegiondynamic/async-storage-sync';
 
 await ensureInitialized({
   driver: 'asyncstorage',
@@ -115,7 +115,7 @@ const one = await store.getById('invoices', all[0].meta.id);
 Using the helper export:
 
 ```ts
-import { getTypedSyncQueue } from 'async-storage-sync';
+import { getTypedSyncQueue } from '@aegiondynamic/async-storage-sync';
 
 type Invoice = { invoiceNo: string; amount: number };
 const store = getTypedSyncQueue<Invoice>();
