@@ -21,6 +21,12 @@
     "queue",
     "offline-first"
   ],
+  "maintainers": [
+    {
+      "name": "aegion-dynamic",
+      "email": "ads@aegiondynamic.com"
+    }
+  ],
   "license": "MIT",
   "peerDependencies": {
     "@react-native-async-storage/async-storage": ">=1.0.0",
